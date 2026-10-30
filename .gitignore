@@ -1,0 +1,21 @@
+# 除了 README.md，md 一律不進 Git
+*.md
+!README.md
+
+# 知識庫真資料不進 Git，只放假範例
+data/*
+!data/examples/
+!data/examples/*.md
+
+# 執行期資料與設定
+storage/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# 本機工具設定
+.claude/

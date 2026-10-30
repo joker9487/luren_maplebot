@@ -1,0 +1,46 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      # 覆蓋 .env 裡給本機開發用的值
+      ENV: production
+      OLLAMA_URL: http://host.docker.internal:11434
+      # key 可以只設在系統環境變數，不寫進 .env
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ./data:/app/data:ro
+      - ./storage:/app/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # 連 Windows 本機的 Ollama
+    ports:
+      # 只開給本機（瀏覽器測試用）；外面的人一律走 Cloudflare Tunnel。
+      # 不要改成 0.0.0.0，否則別人可以直接連、偽造 CF-Connecting-IP 繞過限流
+      # 8000 被占用時可以在 .env 設 APP_PORT=8001
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  # 正式用：有網域、在 Cloudflare 建好 tunnel 後，把 token 填進 .env 的 TUNNEL_TOKEN
+  #   docker compose --profile tunnel up -d
+  # tunnel 的目標服務設成 http://app:8000
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles: ["tunnel"]
+
+  # 測試用：不用網域、不用帳號，會拿到一個 https://xxxx.trycloudflare.com 臨時網址
+  #   docker compose --profile quick up -d
+  #   docker compose logs quick-tunnel   ← 網址在這裡
+  # 每次重開網址都會變
+  quick-tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://app:8000
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles: ["quick"]

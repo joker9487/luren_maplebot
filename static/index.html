@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>楓星新手問答機器人</title>
+<style>
+  :root {
+    --bg: #faf7f2;
+    --surface: #ffffff;
+    --text: #2b2620;
+    --muted: #7a7064;
+    --border: #e6ddd0;
+    --accent: #e8731a;
+    --accent-text: #ffffff;
+    --accent-soft: #fdecdc;
+    --q-bg: #fff4e8;
+    --danger: #c0392b;
+    --danger-soft: #fbe9e7;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1714;
+      --surface: #24201c;
+      --text: #ede6dc;
+      --muted: #a39887;
+      --border: #3a332b;
+      --accent: #f08a3c;
+      --accent-text: #1a1714;
+      --accent-soft: #3a2a1c;
+      --q-bg: #2e2620;
+      --danger: #ff8a7a;
+      --danger-soft: #3a2220;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 16px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); font-size: .92rem; }
+
+  #log { flex: 1; display: flex; flex-direction: column; gap: 16px; margin: 20px 0; }
+  .turn { display: flex; flex-direction: column; gap: 8px; }
+  .q {
+    align-self: flex-end;
+    max-width: 85%;
+    background: var(--q-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) 4px var(--radius);
+    padding: 8px 12px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .a {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) var(--radius) 4px;
+    padding: 12px 14px;
+  }
+  .a .text { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.6em; }
+  .a .text.thinking::after { content: "思考中…"; color: var(--muted); }
+  .a .text.thinking.queued::after { content: "目前人比較多，排隊中…"; }
+  .a .text.streaming::after { content: "▍"; color: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .a.error { border-color: var(--danger); background: var(--danger-soft); }
+  .sources { margin-top: 10px; font-size: .85rem; color: var(--muted); }
+  .feedback { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: .9rem; }
+  .feedback .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .feedback .reasons { margin-top: 8px; }
+  .feedback .done { color: var(--muted); }
+
+  .chip {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font: inherit;
+    font-size: .88rem;
+    cursor: pointer;
+  }
+  .chip:hover:not(:disabled) { border-color: var(--accent); }
+  .chip:disabled { opacity: .5; cursor: default; }
+  .chip.emoji { font-size: 1.05rem; padding: 2px 12px; }
+
+  .composer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    padding: 8px 0 4px;
+  }
+  .faq { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  form { display: flex; gap: 8px; }
+  #q {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  #q:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #send {
+    font: inherit;
+    font-weight: 600;
+    background: var(--accent);
+    color: var(--accent-text);
+    border: 0;
+    border-radius: var(--radius);
+    padding: 0 18px;
+    min-width: 84px;
+    cursor: pointer;
+  }
+  #send:disabled { opacity: .55; cursor: default; }
+  #notice { min-height: 1.4em; margin: 6px 2px 0; font-size: .88rem; color: var(--danger); }
+  footer { color: var(--muted); font-size: .78rem; text-align: center; padding: 8px 0 4px; }
+  .suggest-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin: 2px 0 8px; padding: 6px 16px;
+    font: inherit; font-size: .92rem; font-weight: 600;
+    color: var(--text); background: var(--accent-soft);
+    border: 1px solid var(--accent); border-radius: 999px; cursor: pointer;
+  }
+  .suggest-cta:hover { background: var(--accent); color: var(--accent-text); }
+
+  /* 目前收錄的內容 */
+  .topics { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .topics > summary { padding: 10px 14px; cursor: pointer; font-weight: 600; }
+  .topics-body { padding: 0 14px 12px; }
+  .topics-hint { margin: 0 0 8px; color: var(--muted); font-size: .85rem; }
+  .cat { border-top: 1px solid var(--border); }
+  .cat > summary { padding: 8px 0; cursor: pointer; }
+  .cat .count { color: var(--muted); font-size: .85rem; margin-left: 4px; }
+  .cat .intro { margin: 0 0 8px; color: var(--muted); font-size: .85rem; white-space: pre-line; }
+  .cat .titles { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; }
+
+  /* 許願 */
+  .suggest { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: var(--radius); background: var(--accent-soft); font-size: .9rem; }
+  .suggest .row { display: flex; gap: 6px; margin-top: 6px; }
+  .suggest input {
+    flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  }
+  .suggest .msg { margin-top: 6px; color: var(--danger); font-size: .85rem; }
+  .suggest.done { border-style: solid; color: var(--muted); }
+  #footer-suggest .suggest { text-align: left; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span>楓星</span>新手問答機器人</h1>
+    <p>玩家自製的非官方工具，根據玩家整理的攻略資料回答新手常見問題。</p>
+  </header>
+
+  <details class="topics" id="topics" hidden>
+    <summary id="topics-summary">📚 目前收錄的內容</summary>
+    <div class="topics-body">
+      <p class="topics-hint">資料是玩家整理的，還在慢慢補。點題目可以直接問。</p>
+      <div id="topics-list"></div>
+    </div>
+  </details>
+
+  <main id="log" aria-live="polite"></main>
+
+  <div class="composer">
+    <div class="faq" id="faq"></div>
+    <form id="form" autocomplete="off">
+      <input id="q" name="q" type="text" maxlength="200" placeholder="輸入你的問題，例如：影武者幾等轉職？" aria-label="問題">
+      <button id="send" type="submit">送出</button>
+    </form>
+    <p id="notice" role="status"></p>
+    <footer>
+      <div><button type="button" class="suggest-cta" id="open-suggest">💬 想問的沒有？告訴我們</button></div>
+      <div id="footer-suggest"></div>
+      回答由 AI 根據玩家整理的資料產生，可能有錯，請以官方公告為準。問題內容會被記錄，用來改善回答。
+    </footer>
+  </div>
+</div>
+
+<script>
+// 常見問題按鈕（改這裡就好）
+const FAQ = [
+  "影武者幾等轉職？",
+  "30 等去哪練等？",
+  "交易被封鎖怎麼辦？",
+  "冒險家四轉要準備什麼？",
+];
+const DEFAULT_COOLDOWN = 5;          // 每次送出後的冷卻秒數
+const QUEUE_HINT_MS = 3000;          // 等這麼久還沒拿到回應，就提示正在排隊
+const FEEDBACK_REASONS = ["答錯", "沒回答到問題", "資料沒有", "其他"];
+const NO_FEEDBACK_STATUS = new Set(["no_match", "error"]);
+const INVITE_STATUS = new Set(["no_match", "not_found"]);   // 這兩種結果會邀請玩家許願
+
+const $ = (id) => document.getElementById(id);
+const log = $("log"), form = $("form"), input = $("q"), sendBtn = $("send"), notice = $("notice");
+
+let busy = false;
+let cooldownUntil = 0;
+let cooldownTimer = null;
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function scrollToBottom() {
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+
+// ---- 冷卻與送出鈕 ----
+function updateSendButton() {
+  const left = Math.ceil((cooldownUntil - Date.now()) / 1000);
+  if (busy) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = "回答中";
+  } else if (left > 0) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = `${left} 秒`;
+  } else {
+    sendBtn.disabled = false;
+    sendBtn.textContent = "送出";
+    clearInterval(cooldownTimer);
+    cooldownTimer = null;
+  }
+  document.querySelectorAll("#faq .chip").forEach((b) => (b.disabled = sendBtn.disabled));
+}
+
+function startCooldown(seconds) {
+  cooldownUntil = Math.max(cooldownUntil, Date.now() + seconds * 1000);
+  if (!cooldownTimer) cooldownTimer = setInterval(updateSendButton, 250);
+  updateSendButton();
+}
+
+// ---- SSE 解析（fetch + ReadableStream） ----
+async function* readSSE(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const block = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      let event = "message", data = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+      }
+      if (data) yield { event, data: JSON.parse(data) };
+    }
+  }
+}
+
+// 模型偶爾會輸出 markdown 粗體，純文字顯示時把 ** 拿掉
+const clean = (s) => s.replace(/\*\*/g, "");
+
+async function errorMessage(resp) {
+  try {
+    const body = await resp.json();
+    if (resp.status === 422) return "問題要 2～200 個字。";
+    if (body.message) return body.message;
+    if (typeof body.detail === "string") return body.detail;
+  } catch (_) {}
+  if (resp.status === 429) return "問太快了，稍等一下再問。";
+  if (resp.status === 503) return "目前人有點多，稍後再試一次。";
+  return "連線出了點問題，請稍後再試一次。";
+}
+
+// ---- 回饋 ----
+function renderFeedback(card, logId, token, question) {
+  const box = el("div", "feedback");
+  const row = el("div", "row");
+  row.append(el("span", null, "這個回答有幫到你嗎？"));
+  const up = el("button", "chip emoji", "👍");
+  const down = el("button", "chip emoji", "👎");
+  up.type = down.type = "button";
+  up.setAttribute("aria-label", "有幫助");
+  down.setAttribute("aria-label", "沒幫助");
+  row.append(up, down);
+  box.append(row);
+
+  const finish = (text) => box.replaceChildren(el("span", "done", text));
+
+  async function send(helpful, reason) {
+    const invite = reason === "資料沒有";
+    box.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    try {
+      const resp = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ log_id: logId, token, helpful, reason: reason ?? null }),
+      });
+      if (resp.ok || resp.status === 409) {
+        finish("謝謝回饋！");
+        if (invite) renderSuggestBox(card, { prefill: question, source: "feedback", logId });
+      } else finish(await errorMessage(resp));
+    } catch (_) {
+      finish("回饋送不出去，請稍後再試。");
+    }
+  }
+
+  up.onclick = () => send(true);
+  down.onclick = () => {
+    up.disabled = down.disabled = true;
+    const reasons = el("div", "row reasons");
+    reasons.append(el("span", null, "哪裡不好？"));
+    for (const r of FEEDBACK_REASONS) {
+      const b = el("button", "chip", r);
+      b.type = "button";
+      b.onclick = () => send(false, r);
+      reasons.append(b);
+    }
+    box.append(reasons);
+    scrollToBottom();
+  };
+  card.append(box);
+}
+
+// ---- 許願 ----
+const SUGGEST_TITLES = {
+  footer: "想知道什麼？告訴我們，我們會優先整理：",
+  no_match: "這題還沒整理到。要不要告訴我們你想知道什麼？我們會優先整理：",
+  not_found: "資料裡還沒有這題的答案。要不要告訴我們你想知道什麼？我們會優先整理：",
+  feedback: "想知道的資料是什麼？告訴我們，我們會優先整理：",
+};
+
+function renderSuggestBox(container, { prefill = "", source = "footer", logId = null } = {}) {
+  container.querySelector(":scope > .suggest")?.remove();
+  const box = el("div", "suggest");
+  box.append(el("div", null, SUGGEST_TITLES[source]));
+  const row = el("div", "row");
+  const field = el("input");
+  field.type = "text";
+  field.maxLength = 200;
+  field.value = prefill;
+  field.placeholder = "例如：夜使者技能怎麼點？";
+  field.setAttribute("aria-label", "想問的問題");
+  const btn = el("button", "chip", "送出");
+  btn.type = "button";
+  row.append(field, btn);
+  const msg = el("div", "msg");
+  box.append(row, msg);
+
+  async function submit() {
+    const text = field.value.trim();
+    if (text.length < 2 || text.length > 200) { msg.textContent = "要 2～200 個字。"; return; }
+    btn.disabled = field.disabled = true;
+    msg.textContent = "";
+    try {
+      const resp = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, source, log_id: logId }),
+      });
+      if (resp.ok) {
+        box.classList.add("done");
+        box.replaceChildren(el("div", null, "謝謝！已經收到，我們會優先整理。"));
+        return;
+      }
+      msg.textContent = resp.status === 422 ? "要 2～200 個字。" : await errorMessage(resp);
+    } catch (_) {
+      msg.textContent = "送不出去，請稍後再試。";
+    }
+    btn.disabled = field.disabled = false;
+  }
+  btn.onclick = submit;
+  field.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); submit(); } });
+  container.append(box);
+  if (source === "footer") field.focus();
+  scrollToBottom();
+  return box;
+}
+
+// ---- 目前收錄的內容 ----
+async function loadTopics() {
+  try {
+    const resp = await fetch("/api/topics");
+    if (!resp.ok) return;
+    const { categories, total } = await resp.json();
+    if (!categories.length) return;
+    $("topics-summary").textContent = `📚 目前收錄的內容（${categories.length} 類、${total} 條）`;
+    const list = $("topics-list");
+    for (const c of categories) {
+      const cat = el("details", "cat");
+      const summary = el("summary");
+      summary.append(el("b", null, c.name), el("span", "count", `${c.titles.length} 條`));
+      cat.append(summary);
+      if (c.intro) cat.append(el("p", "intro", c.intro));
+      const titles = el("div", "titles");
+      for (const t of c.titles) {
+        const b = el("button", "chip", t);
+        b.type = "button";
+        b.onclick = () => { $("topics").open = false; ask(t); };
+        titles.append(b);
+      }
+      cat.append(titles);
+      list.append(cat);
+    }
+    $("topics").hidden = false;
+  } catch (_) {
+    // 拿不到就不顯示，不影響問答
+  }
+}
+
+// ---- 問答 ----
+async function ask(question) {
+  question = question.trim();
+  if (busy || Date.now() < cooldownUntil) return;
+  if (question.length < 2 || question.length > 200) {
+    notice.textContent = "問題要 2～200 個字。";
+    return;
+  }
+  notice.textContent = "";
+  input.value = "";
+
+  const turn = el("section", "turn");
+  turn.append(el("div", "q", question));
+  const card = el("div", "a");
+  const text = el("div", "text thinking");
+  card.append(text);
+  turn.append(card);
+  log.append(turn);
+  scrollToBottom();
+
+  busy = true;
+  updateSendButton();
+  let cooldown = DEFAULT_COOLDOWN;
+  let answer = "", logId = null, token = null, status = null;
+  // 伺服器在排到名額之前不會回應，等太久就提示排隊中
+  let responded = false;
+  const queueTimer = setTimeout(() => { if (!responded) text.classList.add("queued"); }, QUEUE_HINT_MS);
+
+  try {
+    const resp = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    responded = true;
+    text.classList.remove("queued");
+    if (!resp.ok) {
+      if (resp.status === 429) {
+        const ra = Number(resp.headers.get("Retry-After"));
+        if (ra > 0) cooldown = ra;
+      }
+      throw new Error(await errorMessage(resp));
+    }
+
+    for await (const { event, data } of readSSE(resp)) {
+      if (event === "meta") {
+        logId = data.log_id;
+        token = data.token;
+        if (data.sources && data.sources.length) {
+          const list = data.sources.map((s) => `${s.title}（${s.category}）`).join("、");
+          card.append(el("div", "sources", `資料來源：${list}`));
+        }
+      } else if (event === "token") {
+        text.classList.remove("thinking");
+        text.classList.add("streaming");
+        answer += data.t;
+        text.textContent = clean(answer);
+        scrollToBottom();
+      } else if (event === "done") {
+        status = data.status;
+        if (status === "error") throw new Error(data.message || "抱歉，系統出了點問題，請稍後再試一次。");
+      }
+    }
+    if (!status) throw new Error("回答中斷了，請再問一次。");
+    text.classList.remove("thinking", "streaming");
+    if (logId != null && !NO_FEEDBACK_STATUS.has(status)) renderFeedback(card, logId, token, question);
+    if (INVITE_STATUS.has(status)) renderSuggestBox(card, { prefill: question, source: status, logId });
+  } catch (err) {
+    text.classList.remove("thinking", "streaming", "queued");
+    card.classList.add("error");
+    const msg = err.message && !/fetch|network/i.test(err.message) ? err.message : "連線出了點問題，請稍後再試一次。";
+    text.textContent = answer ? `${clean(answer)}\n\n（${msg}）` : msg;
+  } finally {
+    clearTimeout(queueTimer);
+    busy = false;
+    startCooldown(cooldown);
+    scrollToBottom();
+  }
+}
+
+// ---- 初始化 ----
+for (const q of FAQ) {
+  const b = el("button", "chip", q);
+  b.type = "button";
+  b.onclick = () => ask(q);
+  $("faq").append(b);
+}
+$("open-suggest").onclick = () => {
+  const slot = $("footer-suggest");
+  if (slot.querySelector(".suggest:not(.done)")) slot.replaceChildren();
+  else renderSuggestBox(slot, { source: "footer" });
+};
+loadTopics();
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  ask(input.value);
+});
+input.focus();
+</script>
+</body>
+</html>
