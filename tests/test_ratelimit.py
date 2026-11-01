@@ -141,3 +141,13 @@ def test_rate_key_groups_ipv6_by_64():
     assert rate_key("::ffff:1.2.3.4") == "1.2.3.4"  # IPv4-mapped
     assert rate_key("unknown") == "unknown"
     assert rate_key("testclient") == "testclient"
+
+
+def test_load_test_warns_when_answers_are_cached(capsys):
+    from scripts.load_test import Result, report
+
+    report([Result(200, "answered", 0.5, 1.0)], 1.0)
+    assert "快取" not in capsys.readouterr().out
+
+    report([Result(200, "answered", 0.5, 1.0), Result(200, "answered", 0.01, 0.02, cached=True)], 1.0)
+    assert "有 1 題是快取回答的" in capsys.readouterr().out

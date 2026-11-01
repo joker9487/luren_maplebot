@@ -32,7 +32,7 @@
 | 回答模型 | OpenAI `gpt-5-nano`／Ollama（`LLM_PROVIDER` 切換） |
 | 紀錄 | SQLite（標準函式庫 `sqlite3` + `asyncio.to_thread`） |
 | 前端 | 單一 HTML + 原生 JS，手機版、深淺色 |
-| 部署 | Docker Compose + Cloudflare Tunnel（家用電腦，不開 port） |
+| 部署 | Docker Compose + Cloudflare Tunnel（不開 port） |
 | 測試 | pytest 132 個（外部服務全部用假的）+ GitHub Actions |
 
 ## 架構
@@ -76,6 +76,15 @@ Cloudflare ◄── Tunnel（筆電主動連出去，不用開 port）── cl
 
 `scripts/load_test.py`：每個請求帶不同的假 IP，統計成功 / 429 / 503 和首字時間 P50 / P95。
 
+壓測時**要關掉快取**，不然重複的題目都是快取回答，數字不準（結果裡有快取命中會跳警告）：
+
+```powershell
+$env:CACHE_ENABLED="false"; $env:DB_PATH="storage/loadtest.db"; $env:DAILY_LIMIT="100000"; uvicorn app:app
+python scripts/load_test.py --users 10 --per-user 3
+```
+
+下表的 gpt-5-nano 數字是在快取功能加入之前測的，7b 是關掉快取測的，都是真的呼叫模型。
+
 | 回答模型 | 同時生成上限 | 人數 × 題數 | 成功 / 503 | 首字 P50 / P95 |
 |---|---|---|---|---|
 | OpenAI gpt-5-nano | 10 | 10 × 3 | 30 / 0 | 0.9s / 2.3s |
@@ -102,7 +111,7 @@ Cloudflare ◄── Tunnel（筆電主動連出去，不用開 port）── cl
 | `drafting.py` | Discord 討論 → 草稿 |
 | `static/index.html` | 前端 |
 | `search_cli.py` | 互動式檢索，看分數、定門檻 |
-| `scripts/` | `load_test.py` 壓測、`suggestions.py` 許願統計、`draft_from_discord.py` 草稿工具 |
+| `scripts/` | `load_test.py` 壓測、`recent.py` 最近問答與 👎、`suggestions.py` 許願統計、`draft_from_discord.py` 草稿工具 |
 
 ## 本機開發
 
@@ -140,6 +149,7 @@ docker compose up -d app                       # http://localhost:8000（只開�
 | 改了 `data/*.md` | `docker compose run --rm app python ingest.py` |
 | 改了 `.env` | `docker compose restart app` |
 | 程式更新 | `docker compose build`，再 `docker compose up -d app` |
+| 看最近的問答、👎、今天統計 | `docker compose exec app python scripts/recent.py`（唯讀；`--down` 只看 👎、`--answers` 印回答） |
 | 看許願和問不到的題目 | `docker compose run --rm app python scripts/suggestions.py` |
 
 設定的完整說明在 [`.env.example`](.env.example)。

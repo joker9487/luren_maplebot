@@ -5,9 +5,13 @@
   python scripts/load_test.py --users 10 --per-user 2 --questions eval/questions.jsonl
 
 每個請求帶不同的假 IP（CF-Connecting-IP），避開單一 IP 的冷卻和每小時上限。
-注意：每題都會寫進伺服器的 qa.db、也會算進每日上限。
-建議測試時用另一個資料庫、調高每日上限啟動伺服器，例如：
-  DB_PATH=storage/loadtest.db DAILY_LIMIT=100000 uvicorn app:app
+注意：
+- 一定要關掉快取（CACHE_ENABLED=false）。內建題目只有 10 題，開著快取的話只有第一輪會真的問模型，
+  之後全部是快取（幾毫秒），數字會好看得不真實。結果裡有快取命中會跳警告
+- 每題都會寫進伺服器的 qa.db、也會算進每日上限，建議用另一個資料庫、調高每日上限
+
+啟動伺服器（PowerShell）：
+  $env:CACHE_ENABLED="false"; $env:DB_PATH="storage/loadtest.db"; $env:DAILY_LIMIT="100000"; uvicorn app:app
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ class Result:
     status: str | None = None  # SSE done 的 status
     first_token: float | None = None  # 秒
     total: float | None = None  # 秒
+    cached: bool = False  # 這題是快取回答的（沒有真的呼叫模型）
 
 
 def load_questions(path: str | None) -> list[str]:
@@ -97,7 +102,9 @@ async def ask_once(client: httpx.AsyncClient, url: str, question: str) -> Result
                     if event == "token" and result.first_token is None:
                         result.first_token = time.perf_counter() - started
                     elif event == "done":
-                        result.status = json.loads(line[5:])["status"]
+                        done = json.loads(line[5:])
+                        result.status = done["status"]
+                        result.cached = bool(done.get("cached"))
             result.total = time.perf_counter() - started
             return result
     except httpx.HTTPError as e:
@@ -128,6 +135,11 @@ def report(results: list[Result], elapsed: float) -> None:
     print("回答狀態：" + "、".join(f"{k} {v}" for k, v in sorted(statuses.items())))
     print("首字時間：" + summarize([r.first_token for r in ok if r.first_token is not None and r.status != "no_match"]))
     print("總時間：  " + summarize([r.total for r in ok if r.total is not None]))
+    cached = sum(r.cached for r in ok)
+    if cached:
+        print()
+        print(f"⚠️  有 {cached} 題是快取回答的（沒有真的呼叫模型），上面的時間會偏快、不準。")
+        print("   請用 CACHE_ENABLED=false 重新啟動伺服器再測。")
 
 
 def main() -> None:
