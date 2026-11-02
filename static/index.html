@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>楓星新手問答機器人</title>
+<title>楓星問答機器人</title>
 <style>
   :root {
     --bg: #faf7f2;
@@ -168,14 +168,17 @@
 <body>
 <div class="wrap">
   <header>
-    <h1><span>楓星</span>新手問答機器人</h1>
-    <p>玩家自製的非官方工具，根據玩家整理的攻略資料回答新手常見問題。</p>
+    <h1><span>楓星</span>問答機器人</h1>
+    <p>大家好，我是路人</p>
+    <p>只能回答已收錄資料的問題，其他非遊戲相關或無資料的問題無法回答。</p>
+    <p>用愛發電，使用請溫柔一點，感謝大家配合。</p>
+    
   </header>
 
   <details class="topics" id="topics" hidden>
     <summary id="topics-summary">📚 目前收錄的內容</summary>
     <div class="topics-body">
-      <p class="topics-hint">資料是玩家整理的，還在慢慢補。點題目可以直接問。</p>
+      <p class="topics-hint">資料是我本人整理的，還在慢慢補。點題目可以直接問</p>
       <div id="topics-list"></div>
     </div>
   </details>
@@ -191,8 +194,8 @@
     <p id="notice" role="status"></p>
     <footer>
       <div><button type="button" class="suggest-cta" id="open-suggest">💬 想問的沒有？告訴我們</button></div>
-      <div id="footer-suggest"></div>
-      回答由 AI 根據玩家整理的資料產生，可能有錯，請以官方公告為準。問題內容會被記錄，用來改善回答。
+      <div id="footer-suggest" ></div>
+      <p style="color: red;">回答由 AI 依據我整理的資料產生，生成內容無法確保正確且資料整理的攻略可能有部分時效性。<br> AI 回復也可能有錯，請以官方公告為準。問題內容會被記錄，用來改善回答。</p>
     </footer>
   </div>
 </div>
@@ -210,6 +213,7 @@ const QUEUE_HINT_MS = 3000;          // 等這麼久還沒拿到回應，就提�
 const FEEDBACK_REASONS = ["答錯", "沒回答到問題", "資料沒有", "其他"];
 const NO_FEEDBACK_STATUS = new Set(["no_match", "error"]);
 const INVITE_STATUS = new Set(["no_match", "not_found"]);   // 這兩種結果會邀請玩家許願
+const NOT_FOUND_TEXT = "目前資料裡沒有這題的答案。";         // 跟 prompts.py 的 NOT_FOUND 一樣
 
 const $ = (id) => document.getElementById(id);
 const log = $("log"), form = $("form"), input = $("q"), sendBtn = $("send"), notice = $("notice");
@@ -488,6 +492,11 @@ async function ask(question) {
       } else if (event === "done") {
         status = data.status;
         if (status === "error") throw new Error(data.message || "抱歉，系統出了點問題，請稍後再試一次。");
+        if (status === "not_found") {
+          // 模型說資料沒有時，可能還多講了推測或建議：一律只留固定句，也不顯示（其實沒用上的）來源
+          text.textContent = NOT_FOUND_TEXT;
+          card.querySelector(".sources")?.remove();
+        }
       }
     }
     if (!status) throw new Error("回答中斷了，請再問一次。");

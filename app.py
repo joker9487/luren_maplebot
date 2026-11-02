@@ -349,7 +349,7 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     async def index():
         if INDEX_HTML.exists():
             return FileResponse(INDEX_HTML, headers={"Cache-Control": "no-cache"})
-        return PlainTextResponse("楓星新手問答機器人（非官方）— 開發中")
+        return PlainTextResponse("楓星問答機器人— 開發中")
 
     return app
 

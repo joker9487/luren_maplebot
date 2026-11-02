@@ -28,9 +28,10 @@ def test_normalize_question(raw, expected):
 
 # ---- prompts ----
 
-def test_load_prompt_version_and_content():
-    p = load_prompt("prompts/answer_v2.txt")
-    assert p.version == "answer_v2"
+@pytest.mark.parametrize("version", ["answer_v2", "answer_v3"])
+def test_load_prompt_version_and_content(version):
+    p = load_prompt(f"prompts/{version}.txt")
+    assert p.version == version
     assert NOT_FOUND in p.system
 
 
@@ -53,13 +54,33 @@ def test_build_messages():
 
 @pytest.mark.parametrize(
     "answer",
-    [NOT_FOUND, "目前資料裡沒有這題的答案", "「目前資料裡沒有這題的答案。」", " 目前資料裡沒有這題的答案。\n", "目前资料里没有这题的答案。"],
+    [
+        NOT_FOUND,
+        "目前資料裡沒有這題的答案",
+        "「目前資料裡沒有這題的答案。」",
+        " 目前資料裡沒有這題的答案。\n",
+        "目前资料里没有这题的答案。",
+        # 固定句後面又自己補了建議
+        "目前資料裡沒有這題的答案。不過你可以到 Discord 問。",
+        # 沒照固定句、自己寫了一段（#683）
+        "結論：目前資料裡沒有提到「洗9 6磁條」相關內容，無法給出明確答案。\n\n步驟：\n- 確認你在問的版本",
+        "資料中沒有皇家騎士團的等級上限。",
+    ],
 )
 def test_classify_not_found(answer):
     assert classify_answer(answer) == "not_found"
 
 
-@pytest.mark.parametrize("answer", ["到 Discord 回報區開單。", "目前資料裡沒有這題的答案。不過你可以到 Discord 問。", ""])
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "到 Discord 回報區開單。",
+        "",
+        # 只回答一部分：開頭是答案，最後才說其他部分沒有
+        "130 等可以去神木村練。\n其他部分目前資料裡沒有。",
+        "資料整理的路線：10～15 等打綠菇菇。",
+    ],
+)
 def test_classify_answered(answer):
     assert classify_answer(answer) == "answered"
 

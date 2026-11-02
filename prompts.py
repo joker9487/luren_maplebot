@@ -46,10 +46,18 @@ def _core(text: str) -> str:
     return _STRIP_RE.sub("", text.translate(_TO_TRAD))
 
 
+# 開頭就說資料沒有（模型沒照固定句、自己寫了一段），例如「結論：目前資料裡沒有提到…」
+_LEADING_NOT_FOUND_RE = re.compile(r"^(結論[:：])?(目前|現有)?的?資料(裡|中|內)?(並|都)?(沒有|未|無)")
+
+
 def classify_answer(answer: str) -> str:
-    """回答是「找不到」固定句 → not_found；其他 → answered。
+    """回答一開頭就是「資料裡沒有」→ not_found；其他 → answered。
 
     比對前去掉空白、引號、句號，並把簡體字轉回來，
-    這樣模型多一個標點或加了引號也判得出來。
+    這樣模型多一個標點、加了引號，或在固定句後面多講幾句都判得出來。
+    「只回答一部分、最後補一句其他部分沒有」不算，因為開頭是答案。
     """
-    return "not_found" if _core(answer) == _core(NOT_FOUND) else "answered"
+    core = _core(answer)
+    if core.startswith(_core(NOT_FOUND)) or _LEADING_NOT_FOUND_RE.match(core):
+        return "not_found"
+    return "answered"
