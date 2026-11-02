@@ -133,6 +133,8 @@
   #send:disabled { opacity: .55; cursor: default; }
   #notice { min-height: 1.4em; margin: 6px 2px 0; font-size: .88rem; color: var(--danger); }
   footer { color: var(--muted); font-size: .78rem; text-align: center; padding: 8px 0 4px; }
+  /* CSP 只放行 <style> 裡的樣式，元素上的 style="" 會被擋，所以顏色寫在這裡 */
+  footer .disclaimer { color: #e5484d; }
   .suggest-cta {
     display: inline-flex; align-items: center; gap: 6px;
     margin: 2px 0 8px; padding: 6px 16px;
@@ -195,7 +197,7 @@
     <footer>
       <div><button type="button" class="suggest-cta" id="open-suggest">💬 想問的沒有？告訴我們</button></div>
       <div id="footer-suggest" ></div>
-      <p style="color: red;">回答由 AI 依據我整理的資料產生，生成內容無法確保正確且資料整理的攻略可能有部分時效性。<br> AI 回復也可能有錯，請以官方公告為準。問題內容會被記錄，用來改善回答。</p>
+      <p class="disclaimer">回答由 AI 依據我整理的資料產生，生成內容無法確保正確且資料整理的攻略可能有部分時效性。<br> AI 回復也可能有錯，請以官方公告為準。問題內容會被記錄，用來改善回答。</p>
     </footer>
   </div>
 </div>
